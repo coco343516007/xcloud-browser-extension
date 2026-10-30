@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "新网安全组规则备注",
+  "version": "1.0.4",
+  "description": "在新网云主机安全组规则表格中显示接口返回的备注。",
+  "host_permissions": [
+    "https://xcloud.xinnet.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://xcloud.xinnet.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

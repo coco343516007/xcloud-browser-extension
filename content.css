@@ -1,0 +1,21 @@
+.ivu-table-wrapper.xinnet-remark-enabled .xinnet-remark-column {
+  box-sizing: border-box;
+}
+
+.ivu-table-wrapper.xinnet-remark-enabled .ivu-table-body {
+  overflow-x: hidden !important;
+}
+
+.ivu-table-wrapper.xinnet-remark-enabled th.xinnet-remark-column {
+  background-color: #f8f8f9;
+  color: #515a6e;
+  font-weight: 600;
+}
+
+.ivu-table-wrapper.xinnet-remark-enabled td.xinnet-remark-column {
+  color: #515a6e;
+}
+
+.ivu-table-wrapper.xinnet-remark-enabled .xinnet-remark-error {
+  color: #ed4014;
+}
