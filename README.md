@@ -18,11 +18,13 @@
 
 ## 数据来源
 
-扩展使用当前浏览器的新网登录状态请求：
+扩展使用当前浏览器的新网登录状态，根据当前安全组编号动态请求：
 
 ```text
-https://xcloud.xinnet.com/api/security/group/rules/98fae34b970240349e2a508600ac7119
+https://xcloud.xinnet.com/api/security/group/rules/{securityGroupCode}
 ```
+
+`safeDetail` 页从 URL 读取编号；`hostDetail` 页从页面当前安全组的规则请求中识别编号。切换安全组或打开任意安全组详情时，备注数据会自动切换，不再绑定某个固定安全组。
 
 规则通过表头名称定位优先级、协议、端口、授权对象和创建时间，因此兼容两个页面不同的列结构。备注列会插入在固定“操作”列之前，占用表格现有宽度并按比例压缩非固定列，不会产生空白列或横向滚动条。
 

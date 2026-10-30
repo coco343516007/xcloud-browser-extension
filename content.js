@@ -2,21 +2,47 @@
   "use strict";
 
   const TARGET_HASH_PREFIX = ["#/siteCloud/hostDetail", "#/network/safeDetail"];
-  const SECURITY_GROUP_CODE = "98fae34b970240349e2a508600ac7119";
-  const RULES_API = `/api/security/group/rules/${SECURITY_GROUP_CODE}`;
   const COLUMN_CLASS = "xinnet-remark-column";
   const PREFERRED_COLUMN_WIDTH = 220;
   const MIN_COLUMN_WIDTH = 140;
+  const SECURITY_GROUP_CODE_PATTERN = /^[a-f0-9]{32}$/i;
+  const RULES_API_PATTERN = /\/api\/security\/group\/rules\/([a-f0-9]{32})(?:[/?#]|$)/i;
 
   let rules = [];
   let hasLoaded = false;
   let loadError = null;
   let fetchPromise = null;
+  let activeSecurityGroupCode = null;
+  let requestSequence = 0;
   let scheduled = false;
   let lastUrl = location.href;
 
   function isTargetPage() {
     return TARGET_HASH_PREFIX.some((prefix) => location.hash.startsWith(prefix));
+  }
+
+  function getSecurityGroupCode() {
+    const queryIndex = location.hash.indexOf("?");
+    if (queryIndex >= 0) {
+      const params = new URLSearchParams(location.hash.slice(queryIndex + 1));
+      const code = params.get("securityGroupCode");
+      if (code && SECURITY_GROUP_CODE_PATTERN.test(code)) {
+        return code;
+      }
+    }
+
+    // hostDetail does not put the security-group code in its URL. Its own
+    // rules request is a same-origin resource entry, including after the user
+    // switches the selected security group.
+    const resources = performance.getEntriesByType("resource");
+    for (let index = resources.length - 1; index >= 0; index -= 1) {
+      const match = resources[index].name.match(RULES_API_PATTERN);
+      if (match) {
+        return match[1];
+      }
+    }
+
+    return null;
   }
 
   function normalized(value) {
@@ -85,21 +111,31 @@
     return map;
   }
 
-  async function loadRules() {
-    if (fetchPromise) {
+  async function loadRules(securityGroupCode = getSecurityGroupCode()) {
+    if (!securityGroupCode) {
+      return null;
+    }
+
+    if (securityGroupCode === activeSecurityGroupCode && fetchPromise) {
       return fetchPromise;
     }
 
+    activeSecurityGroupCode = securityGroupCode;
+    const currentSequence = ++requestSequence;
     hasLoaded = false;
     loadError = null;
+    rules = [];
     scheduleRender();
 
-    fetchPromise = fetch(RULES_API, {
+    const currentRequest = fetch(
+      `/api/security/group/rules/${encodeURIComponent(securityGroupCode)}`,
+      {
       credentials: "include",
       headers: {
         Accept: "application/json",
       },
-    })
+      },
+    )
       .then(async (response) => {
         if (!response.ok) {
           throw new Error(`接口请求失败：HTTP ${response.status}`);
@@ -110,6 +146,10 @@
           throw new Error(payload?.message || payload?.msg || "接口返回格式异常");
         }
 
+        if (currentSequence !== requestSequence) {
+          return;
+        }
+
         rules = [
           ...(Array.isArray(payload.res.ingress) ? payload.res.ingress : []),
           ...(Array.isArray(payload.res.egress) ? payload.res.egress : []),
@@ -118,17 +158,31 @@
         loadError = null;
       })
       .catch((error) => {
+        if (currentSequence !== requestSequence) {
+          return;
+        }
+
         rules = [];
         hasLoaded = true;
         loadError = error instanceof Error ? error.message : String(error);
         console.warn("[新网安全组规则备注]", error);
       })
       .finally(() => {
-        fetchPromise = null;
-        scheduleRender();
+        if (currentSequence === requestSequence) {
+          fetchPromise = null;
+          scheduleRender();
+        }
       });
 
+    fetchPromise = currentRequest;
     return fetchPromise;
+  }
+
+  function syncSecurityGroup() {
+    const securityGroupCode = getSecurityGroupCode();
+    if (securityGroupCode && securityGroupCode !== activeSecurityGroupCode) {
+      loadRules(securityGroupCode);
+    }
   }
 
   function getTableLayout(wrapper) {
@@ -343,6 +397,7 @@
       return;
     }
 
+    syncSecurityGroup();
     const remarkMap = getRemarkMap();
     const wrappers = Array.from(document.querySelectorAll(".ivu-table-wrapper")).filter(isRulesTable);
 
@@ -367,7 +422,7 @@
 
     lastUrl = location.href;
     if (isTargetPage()) {
-      loadRules();
+      syncSecurityGroup();
     }
     scheduleRender();
   }
@@ -387,7 +442,7 @@
   window.addEventListener("resize", scheduleRender);
 
   if (isTargetPage()) {
-    loadRules();
+    syncSecurityGroup();
   }
   scheduleRender();
 })();
